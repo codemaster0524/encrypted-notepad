@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>암호화 메모장</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+    
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='50%' x='50%' text-anchor='middle' dominant-baseline='central' font-size='80'>🔐</text></svg>">
+
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: white;
+            overflow-x: hidden;
+            padding: 20px;
+        }
+
+        .dashboard {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 20px;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .widget {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 25px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .widget:hover {
+            transform: translateY(-5px);
+            background: rgba(255, 255, 255, 0.15);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
+        }
+
+        .widget::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: linear-gradient(90deg, #ff6b6b, #4ecdc4, #45b7d1, #96ceb4);
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .widget:hover::before {
+            opacity: 1;
+        }
+
+        .widget h2 {
+            font-size: 1.5rem;
+            margin-bottom: 20px;
+            color: #fff;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .dashboard-title {
+            font-size: 2.5rem;
+            font-weight: bold;
+            margin-bottom: 20px;
+            text-align: center;
+            background: repeating-linear-gradient(
+                to right,
+                #ff6b6b 0%, #feca57 20%, #48dbfb 40%, #1dd1a1 60%, #ff6b6b 80%, #feca57 100%
+            );
+            background-size: 400% auto;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            animation: shine 12s linear infinite;
+        }
+
+        @keyframes shine {
+            0% {
+                background-position: 0% center;
+            }
+            100% {
+                background-position: 100% center;
+            }
+        }
+
+        /* 알림 스타일 - 퍼스널 대시보드와 동일 */
+        .alert {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 15px 20px;
+            border-radius: 10px;
+            color: white;
+            font-weight: bold;
+            z-index: 10000;
+            transform: translateX(400px);
+            opacity: 0;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        }
+
+        .alert.show {
+            transform: translateX(0);
+            opacity: 1;
+        }
+
+        .alert.success {
+            background: linear-gradient(135deg, #4caf50, #45a049);
+        }
+
+        .alert.info {
+            background: linear-gradient(135deg, #2196f3, #1976d2);
+        }
+
+        .alert.error {
+            background: linear-gradient(135deg, #f44336, #d32f2f);
+        }
+
+        .memo-input {
+            width: 100%;
+            padding: 15px;
+            border: none;
+            border-radius: 10px;
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            font-size: 1rem;
+            margin-bottom: 15px;
+            outline: none;
+            transition: all 0.3s ease;
+        }
+
+        .memo-input:focus {
+            background: rgba(255, 255, 255, 0.2);
+            transform: scale(1.02);
+        }
+
+        .memo-input::placeholder {
+            color: rgba(255, 255, 255, 0.6);
+        }
+
+        .memo-textarea {
+            width: 100%;
+            height: 300px;
+            background: rgba(255, 255, 255, 0.1);
+            border: none;
+            border-radius: 10px;
+            padding: 15px;
+            color: white;
+            font-size: 1rem;
+            resize: none;
+            outline: none;
+            transition: all 0.3s ease;
+            margin-bottom: 15px;
+        }
+
+        .memo-textarea:focus {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        .memo-textarea::placeholder {
+            color: rgba(255, 255, 255, 0.6);
+        }
+
+        .btn {
+            padding: 12px 20px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            margin-right: 10px;
+            margin-bottom: 10px;
+        }
+
+        .btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: scale(1.05);
+        }
+
+        .btn-save {
+            background: rgba(76, 175, 80, 0.6);
+        }
+
+        .btn-load {
+            background: rgba(33, 150, 243, 0.6);
+        }
+
+        .btn-clear {
+            background: rgba(244, 67, 54, 0.6);
+        }
+
+        .info-widget {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 15px;
+            font-size: 0.9rem;
+            line-height: 1.6;
+        }
+
+        .info-widget h3 {
+            color: #4ecdc4;
+            margin-bottom: 10px;
+            font-size: 1.1rem;
+        }
+
+        .feature-note {
+            background: rgba(76, 175, 80, 0.2);
+            border-left: 4px solid #4caf50;
+            padding: 10px 15px;
+            border-radius: 5px;
+            margin-top: 10px;
+        }
+
+        .security-note {
+            background: rgba(255, 193, 7, 0.2);
+            border-left: 4px solid #ffc107;
+            padding: 10px 15px;
+            border-radius: 5px;
+            margin-top: 10px;
+        }
+
+        .usage-steps {
+            font-size: 1rem;
+            line-height: 1.8;
+        }
+
+        .usage-steps p {
+            margin-bottom: 15px;
+        }
+
+        @media (max-width: 768px) {
+            .dashboard {
+                grid-template-columns: 1fr;
+            }
+            
+            .dashboard-title {
+                font-size: 2rem;
+            }
+
+            .memo-textarea {
+                height: 250px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="dashboard">
+        <!-- 메인 암호화 메모장 위젯 -->
+        <div class="widget">
+            <div class="dashboard-title">🔐 암호화 메모장</div>
+            
+            <input type="password" id="password" class="memo-input" placeholder="비밀번호를 입력하세요..." />
+            
+            <textarea id="memo" class="memo-textarea" placeholder="여기에 메모를 작성하세요...&#10;&#10;💡 팁: 비밀번호를 설정하고 저장하면 AES 암호화로 안전하게 보관됩니다!"></textarea>
+            
+            <div>
+                <button class="btn btn-save" onclick="saveMemo()">💾 저장</button>
+                <button class="btn btn-load" onclick="loadMemo()">📂 불러오기</button>
+            </div>
+
+            <div class="info-widget">
+                <h3>🛡️ 보안 기능</h3>
+                <p>• <strong>AES 암호화</strong>: 군사급 암호화 알고리즘 사용</p>
+                <p>• <strong>로컬 저장</strong>: 브라우저에 암호화된 상태로 안전하게 저장</p>
+                <p>• <strong>비밀번호 보호</strong>: 올바른 비밀번호로만 복호화 가능</p>
+                
+                <div class="security-note">
+                    🔒 <strong>개인정보 보호</strong>: 모든 데이터는 사용자의 브라우저에만 저장되며, 
+                    서버로 전송되지 않아 완전히 안전합니다!
+                </div>
+            </div>
+        </div>
+
+        <!-- 사용법 안내 위젯 -->
+        <div class="widget">
+            <h2>📖 사용법 가이드</h2>
+            
+            <div class="usage-steps">
+                <p><strong>1단계:</strong> 비밀번호 입력란에 원하는 비밀번호를 설정하세요</p>
+                <p><strong>2단계:</strong> 텍스트 영역에 보호하고 싶은 메모를 작성하세요</p>
+                <p><strong>3단계:</strong> '💾 저장' 버튼을 클릭하여 암호화된 메모를 저장하세요</p>
+                <p><strong>4단계:</strong> 메모를 확인하려면 같은 비밀번호를 입력하고 '📂 불러오기'를 클릭하세요</p>
+            </div>
+
+            <div class="info-widget">
+                <h3>✨ 특징</h3>
+                <p>• 실시간 암호화/복호화</p>
+                <p>• 비밀번호 없이는 절대 복호화 불가</p>
+                <p>• 깔끔하고 직관적인 인터페이스</p>
+                <p>• 다양한 암호화 강도 지원</p>
+                
+                <div class="feature-note">
+                    💡 <strong>팁:</strong> Enter 키를 누르면 자동으로 저장 또는 불러오기가 실행됩니다!
+                </div>
+            </div>
+        </div>
+
+        <!-- 보안 정보 위젯 -->
+        <div class="widget">
+            <h2>🔒 보안 정보</h2>
+            
+            <div class="info-widget">
+                <h3>🏛️ AES 암호화란?</h3>
+                <p>Advanced Encryption Standard의 약자로, 미국 정부와 전 세계에서 사용하는 대칭키 암호화 표준입니다.</p>
+            </div>
+
+            <div class="info-widget">
+                <h3>⚡ 성능 특징</h3>
+                <p>• <strong>빠른 속도</strong>: 실시간 암호화/복호화</p>
+                <p>• <strong>강력한 보안</strong>: 256비트 키 사용</p>
+                <p>• <strong>효율성</strong>: 최소한의 리소스 사용</p>
+                <p>• <strong>안정성</strong>: 수많은 검증을 거친 알고리즘</p>
+            </div>
+
+            <div class="info-widget">
+                <h3>💾 데이터 저장</h3>
+                <p>모든 암호화된 데이터는 브라우저의 로컬 스토리지에 저장됩니다. 외부 서버나 클라우드로 전송되지 않아 완전한 프라이버시를 보장합니다.</p>
+                
+                <div class="security-note">
+                    ⚠️ <strong>주의사항</strong>: 비밀번호를 잊어버리면 메모를 복구할 수 없습니다. 안전한 곳에 보관하세요!
+                </div>
+            </div>
+            <!-- 기존 clearMemo 버튼 부분을 이것으로 교체 -->
+<div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid rgba(255,255,255,0.2);">
+    <input type="text" id="reset-confirm" class="memo-input" placeholder="RESET을 입력하여 전체 삭제" />
+    <button class="btn btn-clear" onclick="resetMemo()">🗑️ 전체삭제</button>
+    <div style="margin-top: 10px; font-size: 0.9rem; opacity: 0.8;">
+        ※ 정확히 <strong>RESET</strong> 입력 시에만 삭제됩니다.<br>
+        모든 암호화된 메모가 완전히 삭제됩니다.
+    </div>
+</div>
+        </div>
+    </div>
+
+    <script>
+
+function saveToLocalStorage() {
+  localStorage.setItem('flashcardStatus', JSON.stringify(words));
+}
+
+
+function setStatus(status) {
+  const activeWords = showingFiltered ? filteredWords : words;
+  if (activeWords.length === 0) return;
+
+  const currentWord = activeWords[currentIndex];
+  currentWord.status = status;
+
+  saveToLocalStorage(); // ✅ 이 함수가 아래에 필요함
+
+  updateCard();
+  updateStats();
+
+  const statusEmoji = {
+    '모름': '❌',
+    '의심': '❓',
+    '암기함': '✅'
+  };
+
+  showAlert(`${statusEmoji[status]} ${status}으로 설정되었습니다!`, 'success');
+}
+
+
+        function showAlert(message, type = 'success') {
+            // 기존 알림 제거
+            const existingAlert = document.querySelector('.alert');
+            if (existingAlert) {
+                existingAlert.remove();
+            }
+
+            // 새 알림 생성
+            const alert = document.createElement('div');
+            alert.className = `alert ${type}`;
+            alert.textContent = message;
+            document.body.appendChild(alert);
+
+            // 애니메이션 실행
+            setTimeout(() => alert.classList.add('show'), 100);
+
+            // 3초 후 제거
+            setTimeout(() => {
+                alert.classList.remove('show');
+                setTimeout(() => alert.remove(), 300);
+            }, 3000);
+        }
+
+        function saveMemo() {
+            const password = document.getElementById('password').value;
+            const text = document.getElementById('memo').value;
+
+            if (!password || !text) {
+                showAlert("❌ 비밀번호와 메모를 모두 입력해주세요!", 'error');
+                return;
+            }
+
+            try {
+                // AES 암호화
+                const encrypted = CryptoJS.AES.encrypt(text, password).toString();
+                localStorage.setItem('encryptedMemo', encrypted);
+                
+                // UI 초기화
+                document.getElementById('memo').value = "";
+                document.getElementById('password').value = "";
+                
+                showAlert("✅ 메모가 암호화되어 저장되었습니다!", 'success');
+            } catch (error) {
+                showAlert("❌ 암호화 중 오류가 발생했습니다.", 'error');
+            }
+        }
+
+        function loadMemo() {
+            const password = document.getElementById('password').value;
+
+            if (!password) {
+                showAlert("❌ 비밀번호를 입력해주세요!", 'error');
+                return;
+            }
+
+            const encryptedStorage = localStorage.getItem('encryptedMemo');
+            if (!encryptedStorage) {
+                showAlert("❌ 저장된 메모가 없습니다!", 'error');
+                return;
+            }
+
+            try {
+                // AES 복호화
+                const bytes = CryptoJS.AES.decrypt(encryptedStorage, password);
+                const decrypted = bytes.toString(CryptoJS.enc.Utf8);
+
+                if (!decrypted) {
+                    throw new Error('복호화 실패');
+                }
+
+                document.getElementById('memo').value = decrypted;
+                document.getElementById('password').value = "";
+                
+                showAlert("🔓 메모가 성공적으로 복호화되었습니다!", 'success');
+            } catch (error) {
+                showAlert("❌ 비밀번호가 틀렸거나 복호화에 실패했습니다!", 'error');
+            }
+        }
+
+// 기존 clearMemo 함수를 삭제하고 이것으로 교체
+function resetMemo() {
+    const input = document.getElementById('reset-confirm').value.trim();
+    
+    if (input === 'RESET') {
+        localStorage.removeItem('encryptedMemo');
+        document.getElementById('memo').value = "";
+        document.getElementById('password').value = "";
+        
+        // 입력칸 초기화
+        document.getElementById('reset-confirm').value = '';
+        
+        showAlert("🗑️ 모든 암호화 메모가 삭제되었습니다!", 'info');
+    } else {
+        showAlert("❌ RESET을 정확히 입력해야 합니다.", 'error');
+    }
+}
+        // Enter 키 이벤트 처리
+        document.getElementById('password').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                const memoValue = document.getElementById('memo').value;
+                if (memoValue.trim()) {
+                    saveMemo();
+                } else {
+                    loadMemo();
+                }
+            }
+        });
+
+        // 페이지 로드 시 환영 메시지
+        window.addEventListener('load', function() {
+            setTimeout(() => {
+                showAlert("🚀 암호화 메모장에 오신 것을 환영합니다!", 'info');
+            }, 500);
+            
+            // 저장된 메모가 있는지 확인
+            if (localStorage.getItem('encryptedMemo')) {
+                setTimeout(() => {
+                    showAlert("💾 저장된 암호화 메모가 있습니다!", 'info');
+                }, 2500);
+            }
+        });
+    </script>
+</body>
+</html>
